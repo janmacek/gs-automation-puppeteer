@@ -67,54 +67,59 @@ exports.gsAutomation = (req, res) => {
      * @param page  Object of currently initialized page.
      */
     async function processMainPage(page) {
-        await page.waitForXPath(config.XPATH_CHALLENGE_NAME_DIV)
-        let challenges = await page.$x(config.XPATH_CHALLENGE_NAME_DIV)
-        for (const challenge of challenges) {
-            try {
-                await delay(5000)
-                const challenge_name = await page.evaluate(element => element.textContent, challenge);
-                while (true) {
-                    try {
-                        const challenge_exposure_meter = await page.$x(config.XPATH_CHALLENGES_EXPOSURE_METER_DIV
-                            .replace('#CHALLENGE_NAME', challenge_name))
-                        const challenge_exposure = await page.evaluate(
-                            element => window.getComputedStyle(element).transform, challenge_exposure_meter[0]
-                        );
-                        let angle = Math.round(Math.asin(challenge_exposure.split(',')[1]) * (180 / Math.PI));
-                        console.log(`Exposure of challenge '${challenge_name}' is ${angle}.`)
-                        if (angle >= config.MAX_EXPOSURE) {
-                            console.log(`As exposure cannot be higher, processing of this challenge is done.`)
+        try {
+            await page.waitForXPath(config.XPATH_CHALLENGE_NAME_DIV)
+            let challenges = await page.$x(config.XPATH_CHALLENGE_NAME_DIV)
+            for (const challenge of challenges) {
+                try {
+                    await delay(5000)
+                    const challenge_name = await page.evaluate(element => element.textContent, challenge);
+                    while (true) {
+                        try {
+                            const challenge_exposure_meter = await page.$x(config.XPATH_CHALLENGES_EXPOSURE_METER_DIV
+                                .replace('#CHALLENGE_NAME', challenge_name))
+                            const challenge_exposure = await page.evaluate(
+                                element => window.getComputedStyle(element).transform, challenge_exposure_meter[0]
+                            );
+                            let angle = Math.round(Math.asin(challenge_exposure.split(',')[1]) * (180 / Math.PI));
+                            console.log(`Exposure of challenge '${challenge_name}' is ${angle}.`)
+                            if (angle >= config.MAX_EXPOSURE) {
+                                console.log(`As exposure cannot be higher, processing of this challenge is done.`)
+                                break;
+                            }
+                        } catch (e) {
+                            console.warn(`Unable to proceed with challenge '${challenge_name}'.`);
                             break;
                         }
-                    } catch (e) {
-                        console.warn(`Unable to proceed with challenge '${challenge_name}'.`);
-                        break;
-                    }
-                    await elClick(page, config.XPATH_CHALLENGES_VOTE_BUTTON
-                        .replace('#CHALLENGE_NAME', challenge_name));
-                    await page.waitForXPath(config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
-                    await elClick(page, config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
-                    const photo_count = await page.$x(config.XPATH_CHALLENGE_PHOTO_DIV).length;
-                    let position = 1;
-                    for (let i = 0; i < config.AMOUNT_PHOTOS_TO_VOTE; i++) {
-                        if (photo_count < position) {
-                            break;
+                        await elClick(page, config.XPATH_CHALLENGES_VOTE_BUTTON
+                            .replace('#CHALLENGE_NAME', challenge_name));
+                        await page.waitForXPath(config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
+                        await elClick(page, config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
+                        const photo_count = await page.$x(config.XPATH_CHALLENGE_PHOTO_DIV).length;
+                        let position = 1;
+                        for (let i = 0; i < config.AMOUNT_PHOTOS_TO_VOTE; i++) {
+                            if (photo_count < position) {
+                                break;
+                            }
+                            await elClick(
+                                page, '(' + config.XPATH_CHALLENGE_PHOTO_DIV + ')[position()=' + position + ']'
+                            );
+                            position += Math.floor(Math.random() * 5) + 1;
+                            await delay(500);
                         }
-                        await elClick(
-                            page, '(' + config.XPATH_CHALLENGE_PHOTO_DIV + ')[position()=' + position + ']'
-                        );
-                        position += Math.floor(Math.random() * 5) + 1;
-                        await delay(500);
+                        await elClick(page, config.XPATH_CHALLENGE_SUBMIT_VOTES_DIV);
+                        await elClick(page, config.XPATH_CHALLENGE_DONE_DIV);
+                        await delay(1000);
                     }
-                    await elClick(page, config.XPATH_CHALLENGE_SUBMIT_VOTES_DIV);
-                    await elClick(page, config.XPATH_CHALLENGE_DONE_DIV);
+                } catch (e) {
+                    console.warn(`An error occurred. Processing of current challenge is stopped: '${e}'`);
                 }
-            } catch (e) {
-                console.warn(`An error occurred. Processing of current challenge is stopped: '${e}'`);
             }
-        }
 
-        console.log('All challenges were processed.')
+            console.log('All challenges were processed.')
+        } catch (e) {
+            return new Promise((_, reject) => reject(e))
+        }
         return new Promise((resolve, _) => resolve())
     }
 
@@ -124,14 +129,18 @@ exports.gsAutomation = (req, res) => {
      * @param page  Object of currently initialized page.
      */
     async function processLoginPage(page) {
-        await page.setViewport({width: config.WINDOW_WIDTH, height: config.WINDOW_HEIGHT});
-        await page.goto(config.URL_LOGIN_PAGE);
-        await elClick(page, config.XPATH_LOGIN_SIGN_IN_BUTTON);
-        await delay(2000);
-        await elFill(page, config.XPATH_LOGIN_NAME_INPUT, req.query.loginName);
-        await elFill(page, config.XPATH_LOGIN_PASSWORD_INPUT, req.query.loginPwd);
-        await elClick(page, config.XPATH_LOGIN_SUBMIT_BUTTON);
-        console.log('Login page successfully processed.')
+        try {
+            await page.setViewport({width: config.WINDOW_WIDTH, height: config.WINDOW_HEIGHT});
+            await page.goto(config.URL_LOGIN_PAGE);
+            await elClick(page, config.XPATH_LOGIN_SIGN_IN_BUTTON);
+            await delay(2000);
+            await elFill(page, config.XPATH_LOGIN_NAME_INPUT, req.query.loginName);
+            await elFill(page, config.XPATH_LOGIN_PASSWORD_INPUT, req.query.loginPwd);
+            await elClick(page, config.XPATH_LOGIN_SUBMIT_BUTTON);
+            console.log('Login page successfully processed.')
+        } catch (e) {
+            return new Promise((_, reject) => reject(e))
+        }
         return new Promise((resolve, _) => resolve())
     }
 
@@ -143,10 +152,14 @@ exports.gsAutomation = (req, res) => {
      * @param value Value to be filled into element.
      */
     async function elFill(page, xpath, value) {
-        await page.waitForXPath(xpath)
-        const elements = await page.$x(xpath)
-        await elements[0].focus()
-        await elements[0].type(value)
+        try {
+            await page.waitForXPath(xpath)
+            const elements = await page.$x(xpath)
+            await elements[0].focus()
+            await elements[0].type(value)
+        } catch (e) {
+            return new Promise((_, reject) => reject(e))
+        }
         return new Promise((resolve, _) => resolve())
     }
 
@@ -157,9 +170,13 @@ exports.gsAutomation = (req, res) => {
      * @param xpath Xpath of the element.
      */
     async function elClick(page, xpath) {
-        await page.waitForXPath(xpath, {'timeout': 5000})
-        const elements = await page.$x(xpath)
-        await elements[0].click()
+        try {
+            await page.waitForXPath(xpath, {'timeout': 5000})
+            const elements = await page.$x(xpath)
+            await elements[0].click()
+        } catch (e) {
+            return new Promise((_, reject) => reject(e))
+        }
         return new Promise((resolve, _) => resolve())
     }
 
@@ -172,26 +189,10 @@ exports.gsAutomation = (req, res) => {
         return new Promise(resolve => setTimeout(resolve, milliseconds));
     }
 
-    // Redefine console logging to contains timestamp when logging happens with prefix of logging type
-    (function formatConsole() {
-        console.primaryLog = console.log.bind(console);
-        console.log = (data) => {
-            console.primaryLog('INFO [' + new Date().toISOString() + '] ', data)
-        };
-        console.primaryWarn = console.warn.bind(console);
-        console.warn = (data) => {
-            console.primaryWarn('WARN [' + new Date().toISOString() + '] ', data)
-        };
-        console.primaryError = console.error.bind(console);
-        console.error = (data) => {
-            console.primaryError('ERROR [' + new Date().toISOString() + '] ', data)
-        };
-    })();
-
     main().then(_ => {
-        res.status(200).send("OK: Automation finished successfully");
+        res.status(200).send('OK: Automation finished successfully');
     }).catch(err => {
         console.error(err);
-        res.status(500).send("ERROR: Automation was interrupted -> " + err);
+        res.status(500).send('ERROR: Automation was interrupted -> ' + err);
     });
 };
