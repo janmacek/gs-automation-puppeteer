@@ -1,4 +1,4 @@
-# Automation of GS webpage with Puppeteer library
+# Automation of GS webpage with Puppeteer library (Node.js)
 This automation is created for running in GCP Cloud Functions environment.
 
 ### Setup:
