@@ -18,4 +18,4 @@ URI=$(gcloud functions describe gsAutomation | grep url | awk '{print $2}')?logi
 gcloud scheduler jobs create http gs-automation-job --schedule "*/10 * * * * " --uri=$URI --http-method GET
 ```
 
-##### Setting up is done in Ubuntu 18.04.
+#### Setting up is done in Ubuntu 18.04.
