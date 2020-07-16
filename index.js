@@ -23,6 +23,8 @@ exports.gsAutomation = (req, res) => {
         'XPATH_CHALLENGE_PHOTO_DIV': '//div[contains(@class, "modal-vote__photo__vote")]',
         'XPATH_CHALLENGE_SUBMIT_VOTES_DIV': '//div[contains(@class, "modal-vote__photos__actions")]/div[contains(@class, "modal-vote__submit on")]',
         'XPATH_CHALLENGE_DONE_DIV': '//div[contains(@class, "modal-vote__message-wrap")]//div[contains(@class, "actions")]//div[contains(text(), "Done")]',
+        'XPATH_END_OF_CHALLENGE_NEXT_DIV': '//md-dialog-actions/div[contains(@class, "c-modal-broadcast--closed__next")]',
+        'XPATH_END_OF_CHALLENGE_CLOSE_DIV': '//div/md-dialog/div[contains(@class, "c-modal-broadcast--closed__close-btn")]',
 
         'AMOUNT_PHOTOS_TO_VOTE': 20,
         'WINDOW_WIDTH': 1400,
@@ -40,7 +42,7 @@ exports.gsAutomation = (req, res) => {
             '--ignore-certificate-errors',
             `--window-size=${config.WINDOW_WIDTH},${config.WINDOW_HEIGHT + config.CHROME_HEADER_HEIGHT}`,
         ],
-        headless: true,
+        headless: false,
     };
 
     /**
@@ -68,6 +70,7 @@ exports.gsAutomation = (req, res) => {
      */
     async function processMainPage(page) {
         try {
+            await cancelEndOfChallengePopup(page)
             await page.waitForXPath(config.XPATH_CHALLENGE_NAME_DIV)
             let challenges = await page.$x(config.XPATH_CHALLENGE_NAME_DIV)
             for (const challenge of challenges) {
@@ -141,6 +144,19 @@ exports.gsAutomation = (req, res) => {
         } catch (e) {
             return new Promise((_, reject) => reject(e))
         }
+        return new Promise((resolve, _) => resolve())
+    }
+
+    /**
+     * Cancels 'end of challenge' popup window that blocks successful proceeding to challenge.
+     *
+     * @param page  Object of currently initialized page.
+     */
+    async function cancelEndOfChallengePopup(page) {
+        try {
+            await elClick(page, config.XPATH_END_OF_CHALLENGE_NEXT_DIV);
+            await elClick(page, config.XPATH_END_OF_CHALLENGE_CLOSE_DIV);
+        } catch (_) {}
         return new Promise((resolve, _) => resolve())
     }
 
