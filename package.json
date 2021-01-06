@@ -7,5 +7,8 @@
     "lodash": "^4.17.15",
     "puppeteer": "^1.9.0",
     "assert": "^2.0.0"
+  },
+  "scripts": {
+    "start": "node index.js"
   }
 }
