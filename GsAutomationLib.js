@@ -1,22 +1,27 @@
 const puppeteer = require('puppeteer');
 const assert = require('assert');
 
+/**
+ * Class that runs automation of GS web page. It process login page of web page and then go through all
+ * challenges and there clicks on photos to "like" them. This is how challenge exposure is kept at
+ * the highest level.
+ */
 class GsAutomationClass {
     
     _config = {
         'URL_LOGIN_PAGE': 'https://gurushots.com/',
 
-        'XPATH_LOGIN_SIGN_IN_BUTTON': '//header[@id="header"]//div[contains(@class, "gs-container")]//div[contains(@class, "user")]/a[contains(@class, "signin")]',
+        'XPATH_LOGIN_SIGN_IN_BUTTON': '//header//div[contains(@class, "gs-container")]//a[contains(text(),"Sign in")]',
         'XPATH_LOGIN_NAME_INPUT': '//div[contains(@class, "modal-login__input")]/input[contains(@name, "email")]',
         'XPATH_LOGIN_PASSWORD_INPUT': '//div[contains(@class, "modal-login__input")]/input[contains(@name, "password")]',
         'XPATH_LOGIN_SUBMIT_BUTTON': '//button[contains(@class, "modal-login__submit")]',
         'XPATH_CHALLENGES_ITEM_DIV': '//div[contains(@class, "my-challenges__items")]/div[contains(@class, "challenges__item")]',
-        'XPATH_CHALLENGES_VOTE_BUTTON': '//div[contains(@class, "my-challenges__items")]/div[contains(@class, "challenges__item")][.//div[contains(text(), "#CHALLENGE_NAME")]]//div[contains(@class, "c-challenges-item__btn")]/i[contains(@class, "icon-voting")]/..',
+        'XPATH_CHALLENGES_VOTE_BUTTON': '//div[contains(@class, "my-challenges__items")]/div[contains(@class, "challenges__item")][.//div[contains(text(), "#CHALLENGE_NAME")]]//div/i[contains(@class, "icon-voting")]/..',
         'XPATH_CHALLENGES_EXPOSURE_METER_DIV': '//div[contains(@class, "my-challenges__items")]/div[contains(@class, "challenges__item")][.//div[contains(text(), "#CHALLENGE_NAME")]]//div[contains(@class, "c-challenges-item__exposure__meter__arrow")]',
-        'XPATH_CHALLENGES_ENTER_VOTING_BUTTON': '//div[contains(@class, "gs-btn--blue") and text()="LET\'S GO"]',
+        'XPATH_CHALLENGES_ENTER_VOTING_BUTTON': '//div[contains(@class, "modal-vote__greeting__text")]/div[text()="LET\'S GO"]',
         'XPATH_CHALLENGE_NAME_DIV': './/div[contains(@class, "c-challenges-item__title__label")]',
-        'XPATH_CHALLENGE_PHOTO_DIV': '//div[contains(@class, "modal-vote__photo__vote")]',
-        'XPATH_CHALLENGE_SUBMIT_VOTES_DIV': '//div[contains(@class, "modal-vote__photos__actions")]/div[contains(@class, "modal-vote__submit on")]',
+        'XPATH_CHALLENGE_PHOTO_DIV': '//div[contains(@id, "vote-photo-#VOTE_PHOTO_INDEX")]',
+        'XPATH_CHALLENGE_SUBMIT_VOTES_DIV': '//div[contains(@class, "modal-vote__photos__actions")]/div[contains(@class, "on")]/span[text()="SUBMIT VOTE"]/..',
         'XPATH_CHALLENGE_DONE_DIV': '//div[contains(@class, "modal-vote__message-wrap")]//div[contains(@class, "actions")]//div[contains(text(), "Done")]',
         'XPATH_END_OF_CHALLENGE_NEXT_DIV': '//md-dialog-actions/div[contains(@class, "c-modal-broadcast--closed__next")]',
         'XPATH_END_OF_CHALLENGE_CLOSE_DIV': '//div/md-dialog/div[contains(@class, "c-modal-broadcast--closed__close-btn")]',
@@ -45,11 +50,6 @@ class GsAutomationClass {
         this._loginPwd = loginPwd
     }
 
-    /**
-     * Main function to run automation of GS web page. It process login page of web page and then go through all
-     * challenges and there clicks on photos to "like" them. This is how challenge exposure is kept at
-     * the highest level.
-     */
     async run() {
         return puppeteer
             .launch(this._puppeteerParams)
@@ -58,6 +58,7 @@ class GsAutomationClass {
                     const page = (await browser.pages())[0];
                     await this.processLoginPage(page);
                     await this.processMainPage(page);
+                    await browser.close()
                     return new Promise((resolve, _) => resolve())
                 } catch (e) {
                     await browser.close()
@@ -78,9 +79,11 @@ class GsAutomationClass {
             await this.cancelEndOfChallengePopup(page)
             await page.waitForXPath(this._config.XPATH_CHALLENGE_NAME_DIV)
             let challenges = await page.$x(this._config.XPATH_CHALLENGE_NAME_DIV)
+
+            // Process every challenge that has lower exposure than 90
             for (const challenge of challenges) {
                 try {
-                    await delay(5000)
+                    await this.delay(5000)
                     const challenge_name = await page.evaluate(element => element.textContent, challenge);
                     while (true) {
                         try {
@@ -99,8 +102,7 @@ class GsAutomationClass {
                             console.warn(`Unable to proceed with challenge '${challenge_name}'.`);
                             break;
                         }
-                        await this.elClick(page, this._config.XPATH_CHALLENGES_VOTE_BUTTON
-                            .replace('#CHALLENGE_NAME', challenge_name));
+                        await this.elClick(page, this._config.XPATH_CHALLENGES_VOTE_BUTTON.replace('#CHALLENGE_NAME', challenge_name));
                         await page.waitForXPath(this._config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
                         await this.elClick(page, this._config.XPATH_CHALLENGES_ENTER_VOTING_BUTTON);
                         const photo_count = await page.$x(this._config.XPATH_CHALLENGE_PHOTO_DIV).length;
@@ -109,17 +111,16 @@ class GsAutomationClass {
                             if (photo_count < position) {
                                 break;
                             }
-                            await this.elClick(
-                                page, '(' + this._config.XPATH_CHALLENGE_PHOTO_DIV + ')[position()=' + position + ']'
-                            );
+                            await this.elClick(page, this._config.XPATH_CHALLENGE_PHOTO_DIV.replace('#VOTE_PHOTO_INDEX', position.toString()));
                             position += Math.floor(Math.random() * 5) + 1;
-                            await delay(500);
+                            await this.delay(500);
                         }
                         await this.elClick(page, this._config.XPATH_CHALLENGE_SUBMIT_VOTES_DIV);
                         await this.elClick(page, this._config.XPATH_CHALLENGE_DONE_DIV);
                         await this.delay(1000);
                     }
                 } catch (e) {
+                    throw(e)
                     console.warn(`An error occurred. Processing of current challenge is stopped: '${e}'`);
                 }
             }
@@ -141,7 +142,7 @@ class GsAutomationClass {
             await page.setViewport({width: this._config.WINDOW_WIDTH, height: this._config.WINDOW_HEIGHT});
             await page.goto(this._config.URL_LOGIN_PAGE);
             await this.elClick(page, this._config.XPATH_LOGIN_SIGN_IN_BUTTON);
-            await delay(2000);
+            await this.delay(2000);
             await this.elFill(page, this._config.XPATH_LOGIN_NAME_INPUT, this._loginName);
             await this.elFill(page, this._config.XPATH_LOGIN_PASSWORD_INPUT, this._loginPwd);
             await this.elClick(page, this._config.XPATH_LOGIN_SUBMIT_BUTTON);
@@ -192,9 +193,26 @@ class GsAutomationClass {
      */
     async elClick(page, xpath) {
         try {
-            await page.waitForXPath(xpath, {'timeout': 5000})
-            const elements = await page.$x(xpath)
-            await elements[0].click()
+            await page.waitForXPath(xpath, {'timeout': 15000})
+            var elements = await page.$x(xpath)
+
+            // There is anti-automatization method introducud -> buttons are multiplied and hidden and 
+            // only one of them is visible. To solve this, all buttons are queried for visibility and 
+            // only first visible button is clicked.
+            var visible_el = undefined
+            for (const element of elements) {
+                if (await page.evaluate((element) => {
+                    element.focus();
+                    return window.getComputedStyle(element).getPropertyValue('display') !== 'none' && element.offsetHeight
+
+                }, element)) {
+                    visible_el = element;
+                    break;
+                }
+            };
+
+          
+            await visible_el.click()
         } catch (e) {
             return new Promise((_, reject) => reject(e))
         }
@@ -211,15 +229,15 @@ class GsAutomationClass {
     }
 };
 
+// This export is used for local testing
 exports.GsAutomationClass = GsAutomationClass
 
 /**
- * Responds to any HTTP request by one tun of automation of all challenges.
+ * Responds to any HTTP request by one tun of automation of all challenges. This export is used by GCP Cloud Fuctions
  *
  * @param {!express:Request} req HTTP request context.
  * @param {!express:Response} res HTTP response context.
  */
-
 exports.runGsAutomation = (req, res) => {
     assert(req.query.loginName && req.query.loginPwd, 'Login name and password for GS webpage are mandatory.')
     
