@@ -5,7 +5,7 @@ This automation is created for running in GCP Cloud Functions environment.
 - First you need `Google Cloud SDK` installed in your computer. Just follow this [tutorial](https://cloud.google.com/sdk/docs/quickstart-debian-ubuntu).
 - Then, you need to deploy Cloud Function. To do so, in console open folder where is this repository cloned and then run following: 
 ```console
-gcloud functions deploy --runtime=nodejs10 --memory=2048MB --timeout=420s --trigger-http gsAutomation
+gcloud functions deploy gsAutomation --entry-point=runGsAutomation --runtime=nodejs12 --memory=2048MB --timeout=420s --trigger-http
 ```
 - Last thing that needs to be done is to trigger the function repeatetly in time. To do so, first you need to know URL of your Cloud Function and then GCP cloud scheduler can be used. 
 To get this URL, run following command: 

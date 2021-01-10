@@ -11,7 +11,7 @@ exports.runGsAutomation = (req, res) => {
     const assert = require('assert');
     assert(req.query.loginName && req.query.loginPwd, 'Login name and password for GS webpage are mandatory.')
     
-    automation = new gsAutomationLib.GsAutomationClass(req.query.loginName, req.query.loginPwd, false)
+    automation = new gsAutomationLib.GsAutomationClass(req.query.loginName, req.query.loginPwd, true)
 
     automation.run().then(_ => {
         res.status(200).send('OK: Automation finished successfully');
