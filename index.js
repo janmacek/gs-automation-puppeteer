@@ -1,13 +1,22 @@
-gsAutomationLib = require('./GsAutomationLib.js')
+const gsAutomationLib = require('./GsAutomationLib.js')
 
-if(process.argv.length != 4) {
-    console.error('This scripts requires 2 arguments: login and password !')
+/**
+ * Responds to any HTTP request by one tun of automation of all challenges. This export is used by GCP Cloud Fuctions
+ *
+ * @param {!express:Request} req HTTP request context.
+ * @param {!express:Response} res HTTP response context.
+ */
+exports.runGsAutomation = (req, res) => {
+
+    const assert = require('assert');
+    assert(req.query.loginName && req.query.loginPwd, 'Login name and password for GS webpage are mandatory.')
+    
+    automation = new gsAutomationLib.GsAutomationClass(req.query.loginName, req.query.loginPwd, false)
+
+    automation.run().then(_ => {
+        res.status(200).send('OK: Automation finished successfully');
+    }).catch(err => {
+        console.error(err);
+        res.status(500).send('ERROR: Automation was interrupted -> ' + err);
+    });
 }
-
-automation = new gsAutomationLib.GsAutomationClass(process.argv[2], process.argv[3])
-
-automation.run().then(_ => {
-    console.log('OK: Automation finished successfully');
-}).catch(err => {
-    console.error(err)
-});    

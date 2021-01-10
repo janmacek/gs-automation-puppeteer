@@ -9,6 +9,7 @@
     "assert": "^2.0.0"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node test.js"
   }
 }

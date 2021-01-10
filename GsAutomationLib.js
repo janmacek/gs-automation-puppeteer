@@ -6,11 +6,13 @@ const assert = require('assert');
  * challenges and there clicks on photos to "like" them. This is how challenge exposure is kept at
  * the highest level.
  */
-class GsAutomationClass {
+exports.GsAutomationClass = class GsAutomationClass {
     
     _config = {
         'URL_LOGIN_PAGE': 'https://gurushots.com/',
+        'URL_CHALLENGES_PAGE': 'https://gurushots.com/challenges/my-challenges',
 
+        // 'XPATH_LOGIN_SIGN_IN_BUTTON': '//header//div[contains(@class, "gs-container")]//a[contains(text(),"Sign in")]',
         'XPATH_LOGIN_SIGN_IN_BUTTON': '//header//div[contains(@class, "gs-container")]//a[contains(text(),"Sign in")]',
         'XPATH_LOGIN_NAME_INPUT': '//div[contains(@class, "modal-login__input")]/input[contains(@name, "email")]',
         'XPATH_LOGIN_PASSWORD_INPUT': '//div[contains(@class, "modal-login__input")]/input[contains(@name, "password")]',
@@ -39,23 +41,30 @@ class GsAutomationClass {
         args: [
             '--incognito',
             '--no-sandbox',
-            '--ignore-certificate-errors',
+            '--disable-setuid-sandbox',
+            '--disable-infobars',
+            '--ignore-certifcate-errors',
+            '--ignore-certifcate-errors-spki-list',
+            '--user-agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3312.0 Safari/537.36"',
             `--window-size=${this._config.WINDOW_WIDTH},${this._config.WINDOW_HEIGHT + this._config.CHROME_HEADER_HEIGHT}`,
         ],
-        headless: false,
+        headless: true,
     };
 
-    constructor(loginName, loginPwd) {
+    constructor(loginName, loginPwd, headless) {
         this._loginName = loginName
         this._loginPwd = loginPwd
+        this._headless = (headless ? true : false)
     }
 
     async run() {
         return puppeteer
-            .launch(this._puppeteerParams)
+            .launch(Object.assign({}, this._puppeteerParams, {'headless': this._headless}))
             .then(async (browser) => {
                 try {
-                    const page = (await browser.pages())[0];
+                    const context = await browser.createIncognitoBrowserContext();
+                    const page = await context.newPage();                   
+
                     await this.processLoginPage(page);
                     await this.processMainPage(page);
                     await browser.close()
@@ -133,7 +142,8 @@ class GsAutomationClass {
     }
 
     /**
-     * Processes login GS page by filling login name and password to inputs and submitting the form.
+     * Processes login GS page by filling login name and password to inputs and submitting the form. 
+     * If user is already logged, skip processing.
      *
      * @param page  Object of currently initialized page.
      */
@@ -141,6 +151,13 @@ class GsAutomationClass {
         try {
             await page.setViewport({width: this._config.WINDOW_WIDTH, height: this._config.WINDOW_HEIGHT});
             await page.goto(this._config.URL_LOGIN_PAGE);
+
+            this.delay(2000)
+            if(page.url().toString().includes(this._config.URL_CHALLENGES_PAGE)) {
+                console.log('As user is already logged in, login page processing is skipped.')
+                return new Promise((resolve, _) => resolve())
+            }
+
             await this.elClick(page, this._config.XPATH_LOGIN_SIGN_IN_BUTTON);
             await this.delay(2000);
             await this.elFill(page, this._config.XPATH_LOGIN_NAME_INPUT, this._loginName);
@@ -211,7 +228,6 @@ class GsAutomationClass {
                 }
             };
 
-          
             await visible_el.click()
         } catch (e) {
             return new Promise((_, reject) => reject(e))
@@ -228,23 +244,3 @@ class GsAutomationClass {
         return new Promise(resolve => setTimeout(resolve, milliseconds));
     }
 };
-
-// This export is used for local testing
-exports.GsAutomationClass = GsAutomationClass
-
-/**
- * Responds to any HTTP request by one tun of automation of all challenges. This export is used by GCP Cloud Fuctions
- *
- * @param {!express:Request} req HTTP request context.
- * @param {!express:Response} res HTTP response context.
- */
-exports.runGsAutomation = (req, res) => {
-    assert(req.query.loginName && req.query.loginPwd, 'Login name and password for GS webpage are mandatory.')
-    
-    gsAutomation(req.query.loginName, req.query.loginPwd).then(_ => {
-        res.status(200).send('OK: Automation finished successfully');
-    }).catch(err => {
-        console.error(err);
-        res.status(500).send('ERROR: Automation was interrupted -> ' + err);
-    });
-}
